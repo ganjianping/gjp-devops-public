@@ -12,6 +12,13 @@ terraform {
 provider "aws" {
   shared_config_files      = ["~/.aws/config"]
   shared_credentials_files = ["~/.aws/credentials"]
-  profile                  = "ganjianping1984"
-  region                   = "ap-southeast-1"
+  profile                  = var.aws_profile
+  region                   = var.aws_region
+
+  default_tags {
+    tags = {
+      Environment = var.environment
+      ManagedBy   = "Terraform"
+    }
+  }  
 }

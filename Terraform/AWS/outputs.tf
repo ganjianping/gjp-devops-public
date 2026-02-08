@@ -19,6 +19,21 @@ output "ec2_security_group_id" {
   value       = var.create_ec2 ? module.ec2[0].ec2_security_group_id : null
 }
 
+output "instance_state" {
+  description = "State of the EC2 instance"
+  value       = var.create_ec2 ? module.ec2[0].instance_state : null
+}
+
+output "ec2_private_ip" {
+  description = "Private IP address of the EC2 instance"
+  value       = var.create_ec2 ? module.ec2[0].instance_private_ip : null
+}
+
+output "ssh_command" {
+  description = "SSH command to connect to the instance based on OS type"
+  value       = var.create_ec2 ? module.ec2[0].ssh_command : null
+}
+
 # S3 Outputs
 output "s3_bucket_name" {
   description = "Name of the S3 bucket"
