@@ -4,7 +4,7 @@ locals {
     ubuntu = {
       # owner  = "679593333241" # aws-marketplace
       # filter = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
-      owner  = "099720109477" # amazon
+      owner  = "099720109477" # Canonical
       filter = "ubuntu-pro-server/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-pro-server-*"
     }
     amazon-linux-2 = {
