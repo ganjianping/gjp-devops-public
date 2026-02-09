@@ -1,3 +1,18 @@
+variable "aws_profile" {
+  description = "AWS CLI profile to use"
+  type        = string
+  default     = "default"
+}
+variable "aws_region" {
+  description = "AWS region to deploy resources in"
+  type        = string
+  default     = "ap-southeast-1"
+}
+variable "environment" {
+  description = "Environment name (e.g., dev, staging, prod)"
+  type        = string
+  default     = "dev"
+}
 variable "s3_bucket_name" {
   description = "S3 bucket name (must be globally unique)"
   type        = string

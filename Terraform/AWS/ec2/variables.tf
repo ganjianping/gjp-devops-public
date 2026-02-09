@@ -1,6 +1,17 @@
+variable "aws_profile" {
+  description = "AWS CLI profile to use"
+  type        = string
+  default     = "default"
+}
+variable "aws_region" {
+  description = "AWS region to deploy resources in"
+  type        = string
+  default     = "ap-southeast-1"
+}
 variable "environment" {
   description = "Environment name (e.g., dev, staging, prod)"
   type        = string
+  default     = "dev"
 }
 variable "vpc_id" {
   description = "VPC ID where the instance will be launched (leave empty for default VPC)"
