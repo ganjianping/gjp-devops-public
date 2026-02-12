@@ -1,0 +1,23 @@
+---
+- name: Install common software on Ubuntu
+  hosts: ubuntu
+  become: yes
+
+  tasks:
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install common packages
+      apt:
+        name:
+          - git
+          - curl
+          - vim
+          - wget
+          - unzip
+          - htop
+          - net-tools
+          - ca-certificates
+        state: present

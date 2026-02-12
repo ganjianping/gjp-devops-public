@@ -1,0 +1,23 @@
+# The default location for the inventory file is “/etc/ansible/hosts
+# WARNING: Do not commit this file with production IPs/credentials
+# Consider using ansible-vault or dynamic inventory
+
+[ubuntu]
+13.229.148.154
+
+[ubuntu:vars]
+ansible_ssh_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+# Pin Ansible to use system Python 3.12 to avoid cryptography compatibility issues
+# After installing Python 3.14, Ansible may auto-discover it and fail because
+# system packages (cryptography) are compiled for Python 3.12
+ansible_python_interpreter=/usr/bin/python3.12
+
+# SECURITY: Use accept-new instead of no to prevent MITM attacks
+# This accepts new keys on first connect but verifies on subsequent connections
+ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new -o ServerAliveInterval=60'
+
+# Connection timeout for faster failure detection
+ansible_ssh_extra_args='-o ConnectTimeout=10'
+

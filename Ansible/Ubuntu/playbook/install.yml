@@ -1,0 +1,3 @@
+---
+- import_playbook: install_common.yml
+- import_playbook: install_python.yml

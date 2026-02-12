@@ -1,0 +1,118 @@
+---
+# Ansible Playbook: Install Latest Python and Pip
+# Description: Installs the latest available Python3 version and pip package manager
+# Target: Ubuntu servers
+
+- name: Install Latest Python and Pip
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    python_version: "3.14"  # Adjust to desired version or "3" for latest available
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: ['python', 'setup']
+
+    - name: Install software-properties-common for add-apt-repository
+      apt:
+        name: software-properties-common
+        state: present
+      tags: ['python', 'setup']
+
+    - name: Add deadsnakes PPA for latest Python versions
+      apt_repository:
+        repo: ppa:deadsnakes/ppa
+        state: present
+        update_cache: yes
+      tags: ['python', 'setup']
+
+    - name: Install Python {{ python_version }}
+      apt:
+        name:
+          - python{{ python_version }}
+          - python{{ python_version }}-dev
+          - python{{ python_version }}-venv
+        state: present
+      tags: ['python', 'install']
+
+    - name: Download get-pip.py
+      get_url:
+        url: https://bootstrap.pypa.io/get-pip.py
+        dest: /tmp/get-pip.py
+        mode: '0755'
+      tags: ['python', 'pip']
+
+    - name: Install pip for Python {{ python_version }}
+      command: python{{ python_version }} /tmp/get-pip.py
+      args:
+        creates: /usr/local/bin/pip{{ python_version }}
+      tags: ['python', 'pip']
+
+    - name: Ensure pip is up to date
+      pip:
+        name: pip
+        state: latest
+        executable: pip{{ python_version }}
+      tags: ['python', 'pip']
+
+    - name: Install essential Python packages
+      pip:
+        name:
+          - setuptools
+          - wheel
+          - virtualenv
+        state: latest
+        executable: pip{{ python_version }}
+      tags: ['python', 'packages']
+
+    - name: Create symbolic links for python and pip
+      file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        state: link
+        force: yes
+      loop:
+        - { src: '/usr/bin/python{{ python_version }}', dest: '/usr/local/bin/python' }
+        - { src: '/usr/local/bin/pip{{ python_version }}', dest: '/usr/local/bin/pip' }
+      tags: ['python', 'symlinks']
+      when: ansible_facts['distribution'] == 'Ubuntu'
+
+    - name: Verify Python installation
+      command: python{{ python_version }} --version
+      register: python_version_output
+      changed_when: false
+      tags: ['python', 'verify']
+
+    - name: Verify pip installation
+      command: pip{{ python_version }} --version
+      register: pip_version_output
+      changed_when: false
+      tags: ['python', 'verify']
+
+    - name: Display Python version
+      debug:
+        msg: "{{ python_version_output.stdout }}"
+      tags: ['python', 'verify']
+
+    - name: Display pip version
+      debug:
+        msg: "{{ pip_version_output.stdout }}"
+      tags: ['python', 'verify']
+
+    - name: Clean up get-pip.py
+      file:
+        path: /tmp/get-pip.py
+        state: absent
+      tags: ['python', 'cleanup']
+
+  handlers:
+    - name: Update alternatives
+      alternatives:
+        name: python
+        path: /usr/bin/python{{ python_version }}
+        link: /usr/bin/python
