@@ -1,0 +1,42 @@
+---
+# Ansible Playbook: Install uv
+# Description: Installs uv - fast Python package installer
+# Target: Ubuntu servers
+
+- name: Install uv
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Download uv installer
+      get_url:
+        url: https://astral.sh/uv/install.sh
+        dest: /tmp/uv-install.sh
+        mode: '0755'
+      tags: ['uv']
+
+    - name: Install uv
+      shell: /tmp/uv-install.sh
+      environment:
+        UV_INSTALL_DIR: /usr/local/bin
+      args:
+        creates: /usr/local/bin/uv
+      tags: ['uv']
+
+    - name: Clean up installer
+      file:
+        path: /tmp/uv-install.sh
+        state: absent
+      tags: ['uv']
+
+    - name: Verify uv installation
+      command: uv --version
+      register: uv_output
+      changed_when: false
+      tags: ['uv']
+
+    - name: Display uv version
+      debug:
+        msg: "{{ uv_output.stdout }}"
+      tags: ['uv']

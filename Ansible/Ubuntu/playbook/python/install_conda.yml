@@ -1,0 +1,58 @@
+---
+# Ansible Playbook: Install Conda
+# Description: Installs Miniconda for Python package and environment management
+# Target: Ubuntu servers
+
+- name: Install Conda
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    miniconda_installer: "Miniconda3-latest-Linux-x86_64.sh"
+    miniconda_install_dir: "/opt/miniconda3"
+
+  tasks:
+    - name: Download Miniconda installer
+      get_url:
+        url: "https://repo.anaconda.com/miniconda/{{ miniconda_installer }}"
+        dest: "/tmp/{{ miniconda_installer }}"
+        mode: '0755'
+      tags: ['conda']
+
+    - name: Install Miniconda
+      command: "/tmp/{{ miniconda_installer }} -b -p {{ miniconda_install_dir }}"
+      args:
+        creates: "{{ miniconda_install_dir }}/bin/conda"
+      tags: ['conda']
+
+    - name: Initialize conda for all users
+      shell: "{{ miniconda_install_dir }}/bin/conda init bash"
+      args:
+        creates: /etc/profile.d/conda.sh
+      tags: ['conda']
+
+    - name: Create conda environment file for system-wide access
+      copy:
+        content: |
+          export PATH="{{ miniconda_install_dir }}/bin:$PATH"
+        dest: /etc/profile.d/conda.sh
+        mode: '0644'
+      tags: ['conda']
+
+    - name: Clean up installer
+      file:
+        path: "/tmp/{{ miniconda_installer }}"
+        state: absent
+      tags: ['conda']
+
+    - name: Verify conda installation
+      command: "{{ miniconda_install_dir }}/bin/conda --version"
+      register: conda_output
+      changed_when: false
+      tags: ['conda']
+
+    - name: Display conda version
+      debug:
+        msg: "{{ conda_output.stdout }}"
+      tags: ['conda']

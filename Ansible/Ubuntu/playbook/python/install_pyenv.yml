@@ -1,0 +1,73 @@
+---
+# Ansible Playbook: Install pyenv
+# Description: Installs pyenv for Python version management
+# Target: Ubuntu servers
+
+- name: Install pyenv
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install dependencies for pyenv
+      apt:
+        name:
+          - make
+          - build-essential
+          - libssl-dev
+          - zlib1g-dev
+          - libbz2-dev
+          - libreadline-dev
+          - libsqlite3-dev
+          - wget
+          - curl
+          - llvm
+          - libncurses5-dev
+          - libncursesw5-dev
+          - xz-utils
+          - tk-dev
+          - libffi-dev
+          - liblzma-dev
+          - git
+        state: present
+        update_cache: yes
+      tags: ['pyenv']
+
+    - name: Clone pyenv repository
+      git:
+        repo: https://github.com/pyenv/pyenv.git
+        dest: /opt/pyenv
+        version: master
+      tags: ['pyenv']
+
+    - name: Set pyenv permissions
+      file:
+        path: /opt/pyenv
+        state: directory
+        mode: '0755'
+        recurse: yes
+      tags: ['pyenv']
+
+    - name: Create pyenv environment file for system-wide access
+      copy:
+        content: |
+          export PYENV_ROOT="/opt/pyenv"
+          export PATH="$PYENV_ROOT/bin:$PATH"
+          eval "$(pyenv init -)"
+        dest: /etc/profile.d/pyenv.sh
+        mode: '0644'
+      tags: ['pyenv']
+
+    - name: Verify pyenv installation
+      shell: |
+        export PYENV_ROOT="/opt/pyenv"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        pyenv --version
+      register: pyenv_output
+      changed_when: false
+      tags: ['pyenv']
+
+    - name: Display pyenv version
+      debug:
+        msg: "{{ pyenv_output.stdout }}"
+      tags: ['pyenv']

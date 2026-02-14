@@ -1,0 +1,57 @@
+---
+# Ansible Playbook: Install Poetry
+# Description: Installs Poetry for Python dependency management
+# Target: Ubuntu servers
+
+- name: Install Poetry
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Download Poetry installer
+      get_url:
+        url: https://install.python-poetry.org
+        dest: /tmp/install-poetry.py
+        mode: '0755'
+      tags: ['poetry']
+
+    - name: Install Poetry
+      shell: python3 /tmp/install-poetry.py
+      environment:
+        POETRY_HOME: /opt/poetry
+      args:
+        creates: /opt/poetry/bin/poetry
+      tags: ['poetry']
+
+    - name: Create Poetry environment file for system-wide access
+      copy:
+        content: |
+          export PATH="/opt/poetry/bin:$PATH"
+        dest: /etc/profile.d/poetry.sh
+        mode: '0644'
+      tags: ['poetry']
+
+    - name: Create symbolic link for poetry
+      file:
+        src: /opt/poetry/bin/poetry
+        dest: /usr/local/bin/poetry
+        state: link
+      tags: ['poetry']
+
+    - name: Clean up installer
+      file:
+        path: /tmp/install-poetry.py
+        state: absent
+      tags: ['poetry']
+
+    - name: Verify Poetry installation
+      command: poetry --version
+      register: poetry_output
+      changed_when: false
+      tags: ['poetry']
+
+    - name: Display Poetry version
+      debug:
+        msg: "{{ poetry_output.stdout }}"
+      tags: ['poetry']

@@ -1,2 +1,2 @@
 #!/bin/bash
-ssh -i ~/.ssh/id_rsa ubuntu@13.229.148.154
+ssh -i ~/.ssh/id_rsa ubuntu@13.251.126.203
