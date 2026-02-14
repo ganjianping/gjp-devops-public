@@ -1,0 +1,40 @@
+---
+# Ansible Playbook: Install JDK
+# Description: Installs OpenJDK 21
+# Target: Ubuntu servers
+
+- name: Install JDK 21
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    jdk_version: "21"
+
+  tasks:
+    - name: Install OpenJDK {{ jdk_version }}
+      apt:
+        name: openjdk-{{ jdk_version }}-jdk
+        state: present
+        update_cache: yes
+      tags: ['jdk']
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        content: |
+          export JAVA_HOME="/usr/lib/jvm/java-{{ jdk_version }}-openjdk-amd64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+        dest: /etc/profile.d/java.sh
+        mode: '0644'
+      tags: ['jdk']
+
+    - name: Verify Java installation
+      command: java -version
+      register: java_output
+      changed_when: false
+      tags: ['jdk']
+
+    - name: Display Java version
+      debug:
+        msg: "{{ java_output.stderr }}"
+      tags: ['jdk']
