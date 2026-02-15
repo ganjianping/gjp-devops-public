@@ -1,0 +1,42 @@
+---
+- name: Download Nginx Configuration Files
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Create local directory for nginx.conf
+      file:
+        path: "{{ playbook_dir }}/../../files/nginx/etc/nginx"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: no
+      run_once: true
+
+    - name: Create local directory for sites-available
+      file:
+        path: "{{ playbook_dir }}/../../files/nginx/etc/nginx/sites-available"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: no
+      run_once: true
+
+    - name: Download /etc/nginx/nginx.conf
+      fetch:
+        src: /etc/nginx/nginx.conf
+        dest: "{{ playbook_dir }}/../../files/nginx/etc/nginx/nginx.conf"
+        flat: yes
+
+    - name: Download /etc/nginx/sites-available/default
+      fetch:
+        src: /etc/nginx/sites-available/default
+        dest: "{{ playbook_dir }}/../../files/nginx/etc/nginx/sites-available/default"
+        flat: yes
+
+    - name: Display download completion message
+      debug:
+        msg:
+          - "Nginx configuration files downloaded successfully!"
+          - "Location: {{ playbook_dir }}/../../files/nginx/etc/nginx/"
+          - "Files: nginx.conf, sites-available/default"

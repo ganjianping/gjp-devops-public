@@ -1,0 +1,55 @@
+---
+- name: Install AWS Corretto JDK 21
+  hosts: all
+  become: yes
+  vars:
+    java_version: "21"
+
+  tasks:
+    - name: Install wget
+      apt:
+        name: wget
+        state: present
+
+    - name: Download Corretto GPG key
+      get_url:
+        url: https://apt.corretto.aws/corretto.key
+        dest: /tmp/corretto.key
+        mode: '0644'
+
+    - name: Add Corretto GPG key
+      command: apt-key add /tmp/corretto.key
+
+    - name: Add AWS Corretto repository manually
+      lineinfile:
+        path: /etc/apt/sources.list.d/corretto.list
+        line: "deb https://apt.corretto.aws stable main"
+        create: yes
+        mode: '0644'
+
+    - name: Install AWS Corretto JDK
+      apt:
+        name: "java-{{ java_version }}-amazon-corretto-jdk"
+        state: present
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        dest: /etc/profile.d/corretto_jdk.sh
+        content: |
+          export JAVA_HOME=/usr/lib/jvm/java-{{ java_version }}-amazon-corretto
+          export PATH=$JAVA_HOME/bin:$PATH
+        mode: '0644'
+
+    - name: Clean up GPG key file
+      file:
+        path: /tmp/corretto.key
+        state: absent
+
+    - name: Verify Java installation
+      command: java -version
+      register: java_version_output
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        var: java_version_output.stderr_lines

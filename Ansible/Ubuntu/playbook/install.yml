@@ -7,5 +7,17 @@
 # - import_playbook: python/install_poetry.yml
 # - import_playbook: python/install_pyenv.yml
 
+# - import_playbook: java/install_open_jdk.yml
+# - import_playbook: java/install_oracle_jdk.yml
+# - import_playbook: java/install_ibm_semeru_jdk.yml
+# - import_playbook: java/install_eclipse_temurin_jdk.yml
+# - import_playbook: java/install_azul_zulu_jdk.yml
+# - import_playbook: java/install_aws_corretto_jdk.yml
+# - import_playbook: java/install_microsoft_open_jdk.yml
+
+# - import_playbook: nodejs/install_node.yml
+# - import_playbook: nodejs/install_nvm.yml
+
+- import_playbook: nginx/install_nginx.yml
+
 # - import_playbook: install_docker.yml
-- import_playbook: install_open_jdk.yml

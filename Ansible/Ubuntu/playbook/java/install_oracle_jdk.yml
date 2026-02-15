@@ -1,0 +1,86 @@
+---
+- name: Install Oracle JDK
+  hosts: all
+  become: yes
+  vars:
+    install_dir: "/usr/lib/jvm"
+    oracle_jdk_version: "21"  # 21 or 25 (older versions require authentication)
+    # Note: For JDK 11, 17, use Eclipse Temurin, AWS Corretto, or Azul Zulu instead
+    jdk_urls:
+      "21": "https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz"
+      "25": "https://download.oracle.com/java/25/latest/jdk-25_linux-x64_bin.tar.gz"
+
+  tasks:
+    - name: Install wget and tar
+      apt:
+        name:
+          - wget
+          - tar
+        state: present
+
+    - name: Create JVM directory
+      file:
+        path: "{{ install_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download Oracle JDK {{ oracle_jdk_version }}
+      get_url:
+        url: "{{ jdk_urls[oracle_jdk_version] }}"
+        dest: "/tmp/oracle-jdk-{{ oracle_jdk_version }}.tar.gz"
+        mode: '0644'
+
+    - name: Extract Oracle JDK
+      unarchive:
+        src: "/tmp/oracle-jdk-{{ oracle_jdk_version }}.tar.gz"
+        dest: "{{ install_dir }}"
+        remote_src: yes
+
+    - name: Find extracted JDK directory
+      find:
+        paths: "{{ install_dir }}"
+        patterns: "jdk-{{ oracle_jdk_version }}.*"
+        file_type: directory
+      register: jdk_dir
+
+    - name: Rename JDK directory to standard name
+      command: mv "{{ jdk_dir.files[0].path }}" "{{ install_dir }}/oracle-jdk-{{ oracle_jdk_version }}"
+      when: jdk_dir.files | length > 0
+      args:
+        creates: "{{ install_dir }}/oracle-jdk-{{ oracle_jdk_version }}"
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        dest: /etc/profile.d/oracle_jdk.sh
+        content: |
+          export JAVA_HOME={{ install_dir }}/oracle-jdk-{{ oracle_jdk_version }}
+          export PATH=$JAVA_HOME/bin:$PATH
+        mode: '0644'
+
+    - name: Create symbolic link for java
+      file:
+        src: "{{ install_dir }}/oracle-jdk-{{ oracle_jdk_version }}/bin/java"
+        dest: /usr/bin/java
+        state: link
+        force: yes
+
+    - name: Create symbolic link for javac
+      file:
+        src: "{{ install_dir }}/oracle-jdk-{{ oracle_jdk_version }}/bin/javac"
+        dest: /usr/bin/javac
+        state: link
+        force: yes
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/oracle-jdk-{{ oracle_jdk_version }}.tar.gz"
+        state: absent
+
+    - name: Verify Java installation
+      command: "{{ install_dir }}/oracle-jdk-{{ oracle_jdk_version }}/bin/java -version"
+      register: java_version_output
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        var: java_version_output.stderr_lines

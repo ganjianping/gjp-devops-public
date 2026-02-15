@@ -1,0 +1,61 @@
+---
+- name: Install IBM Semeru JDK 21
+  hosts: all
+  become: yes
+  vars:
+    java_version: "21"
+    semeru_download_url: "https://github.com/ibmruntimes/semeru21-binaries/releases/download/jdk-21.0.1%2B12_openj9-0.42.0/ibm-semeru-open-jdk_x64_linux_21.0.1_12_openj9-0.42.0.tar.gz"
+    install_dir: "/usr/lib/jvm"
+
+  tasks:
+    - name: Install wget
+      apt:
+        name: wget
+        state: present
+
+    - name: Download IBM Semeru JDK
+      get_url:
+        url: "{{ semeru_download_url }}"
+        dest: "/tmp/ibm-semeru-jdk-21.tar.gz"
+        mode: '0644'
+        timeout: 300
+
+    - name: Create JVM directory
+      file:
+        path: "{{ install_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Extract IBM Semeru JDK
+      unarchive:
+        src: "/tmp/ibm-semeru-jdk-21.tar.gz"
+        dest: "{{ install_dir }}"
+        remote_src: yes
+        creates: "{{ install_dir }}/jdk-21.0.1+12"
+
+    - name: Rename extracted directory
+      command: mv {{ install_dir }}/jdk-21.0.1+12 {{ install_dir }}/ibm-semeru-21-jdk
+      args:
+        creates: "{{ install_dir }}/ibm-semeru-21-jdk"
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/ibm-semeru-jdk-21.tar.gz"
+        state: absent
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        dest: /etc/profile.d/semeru_jdk.sh
+        content: |
+          export JAVA_HOME={{ install_dir }}/ibm-semeru-21-jdk
+          export PATH=$JAVA_HOME/bin:$PATH
+        mode: '0644'
+
+    - name: Verify Java installation
+      command: "{{ install_dir }}/ibm-semeru-21-jdk/bin/java -version"
+      register: java_version_output
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        var: java_version_output.stderr_lines

@@ -1,0 +1,2 @@
+---
+- import_playbook: nginx/download_nginx_config_files.yml

@@ -1,0 +1,48 @@
+---
+- name: Install Eclipse Temurin JDK 21
+  hosts: all
+  become: yes
+  vars:
+    java_version: "21"
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - wget
+          - apt-transport-https
+          - gnupg
+        state: present
+
+    - name: Add Adoptium GPG key
+      apt_key:
+        url: https://packages.adoptium.net/artifactory/api/gpg/key/public
+        state: present
+
+    - name: Add Adoptium repository
+      apt_repository:
+        repo: "deb https://packages.adoptium.net/artifactory/deb {{ ansible_distribution_release }} main"
+        state: present
+        filename: adoptium
+
+    - name: Install Eclipse Temurin JDK
+      apt:
+        name: "temurin-{{ java_version }}-jdk"
+        state: present
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        dest: /etc/profile.d/temurin_jdk.sh
+        content: |
+          export JAVA_HOME=/usr/lib/jvm/temurin-{{ java_version }}-jdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+        mode: '0644'
+
+    - name: Verify Java installation
+      command: java -version
+      register: java_version_output
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        var: java_version_output.stderr_lines

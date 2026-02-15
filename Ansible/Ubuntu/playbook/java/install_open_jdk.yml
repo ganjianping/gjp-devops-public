@@ -1,22 +1,21 @@
 ---
-# Ansible Playbook: Install JDK
-# Description: Installs OpenJDK 21
+# Ansible Playbook: Install OpenJDK
+# Description: Installs OpenJDK {{ jdk_version }}
 # Target: Ubuntu servers
 
-- name: Install JDK 21
+- name: Install OpenJDK {{ jdk_version }}
   hosts: ubuntu
   become: true
   gather_facts: true
 
   vars:
-    jdk_version: "21"
+    jdk_version: "21" # 8, 11, 17, or 21 
 
   tasks:
     - name: Install OpenJDK {{ jdk_version }}
       apt:
         name: openjdk-{{ jdk_version }}-jdk
         state: present
-        update_cache: yes
       tags: ['jdk']
 
     - name: Set JAVA_HOME environment variable

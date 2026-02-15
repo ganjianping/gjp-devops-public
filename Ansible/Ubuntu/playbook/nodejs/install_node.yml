@@ -1,0 +1,47 @@
+---
+- name: Install Node.js 22
+  hosts: all
+  become: yes
+  vars:
+    node_version: "22.13.1"  # Specify full version
+    node_major: "22"
+    install_dir: "/usr/local"
+
+  tasks:
+    - name: Download Node.js binary
+      get_url:
+        url: "https://nodejs.org/dist/v{{ node_version }}/node-v{{ node_version }}-linux-x64.tar.xz"
+        dest: "/tmp/node-v{{ node_version }}-linux-x64.tar.xz"
+        mode: '0644'
+        timeout: 300
+
+    - name: Extract Node.js binary
+      unarchive:
+        src: "/tmp/node-v{{ node_version }}-linux-x64.tar.xz"
+        dest: "{{ install_dir }}"
+        remote_src: yes
+        extra_opts:
+          - --strip-components=1
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/node-v{{ node_version }}-linux-x64.tar.xz"
+        state: absent
+
+    - name: Verify Node.js installation
+      command: node --version
+      register: node_version_output
+      changed_when: false
+
+    - name: Display Node.js version
+      debug:
+        var: node_version_output.stdout_lines
+
+    - name: Verify npm installation
+      command: npm --version
+      register: npm_version_output
+      changed_when: false
+
+    - name: Display npm version
+      debug:
+        var: npm_version_output.stdout_lines

@@ -1,0 +1,52 @@
+---
+- name: Install Azul Zulu JDK 21
+  hosts: all
+  become: yes
+  vars:
+    java_version: "21"
+
+  tasks:
+    - name: Install wget
+      apt:
+        name: wget
+        state: present
+
+    - name: Download Azul GPG key
+      get_url:
+        url: https://repos.azul.com/azul-repo.key
+        dest: /tmp/azul-repo.key
+        mode: '0644'
+
+    - name: Add Azul GPG key
+      command: apt-key add /tmp/azul-repo.key
+      args:
+        creates: /etc/apt/sources.list.d/zulu-openjdk.list
+
+    - name: Add Azul repository manually
+      lineinfile:
+        path: /etc/apt/sources.list.d/zulu-openjdk.list
+        line: "deb https://repos.azul.com/zulu/deb stable main"
+        create: yes
+        mode: '0644'
+
+    - name: Install Azul Zulu JDK
+      apt:
+        name: "zulu{{ java_version }}-jdk"
+        state: present
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        dest: /etc/profile.d/zulu_jdk.sh
+        content: |
+          export JAVA_HOME=/usr/lib/jvm/zulu{{ java_version }}
+          export PATH=$JAVA_HOME/bin:$PATH
+        mode: '0644'
+
+    - name: Verify Java installation
+      command: java -version
+      register: java_version_output
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        var: java_version_output.stderr_lines

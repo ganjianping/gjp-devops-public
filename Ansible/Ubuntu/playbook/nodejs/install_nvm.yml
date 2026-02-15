@@ -1,0 +1,106 @@
+---
+- name: Install NVM (Node Version Manager) 0.40.4
+  hosts: all
+  become: yes
+  vars:
+    nvm_version: "0.40.4"
+    node_versions:
+      - "22"
+      - "24"
+    default_node_version: "24"
+    nvm_install_dir: "/opt/nvm"
+
+  tasks:
+    - name: Remove broken NodeSource repository (if exists)
+      file:
+        path: /etc/apt/sources.list.d/nodesource.list
+        state: absent
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - build-essential
+          - libssl-dev
+        state: present
+
+    - name: Create NVM installation directory
+      file:
+        path: "{{ nvm_install_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download and install NVM
+      shell: |
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v{{ nvm_version }}/install.sh | NVM_DIR={{ nvm_install_dir }} bash
+      args:
+        creates: "{{ nvm_install_dir }}/nvm.sh"
+      environment:
+        HOME: /root
+
+    - name: Set NVM environment variables for all users
+      copy:
+        dest: /etc/profile.d/nvm.sh
+        content: |
+          export NVM_DIR="{{ nvm_install_dir }}"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+          nvm use --silent default > /dev/null 2>&1 || true
+        mode: '0644'
+
+    - name: Install Node.js versions with NVM
+      shell: |
+        source {{ nvm_install_dir }}/nvm.sh
+        if ! nvm ls {{ item }} | grep -q "v{{ item }}\."; then
+          nvm install {{ item }}
+        fi
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: /root
+      loop: "{{ node_versions }}"
+
+    - name: Set Node.js {{ default_node_version }} as default
+      shell: |
+        source {{ nvm_install_dir }}/nvm.sh
+        nvm alias default {{ default_node_version }}
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: /root
+
+    - name: Verify NVM installation
+      shell: |
+        source {{ nvm_install_dir }}/nvm.sh
+        nvm --version
+      args:
+        executable: /bin/bash
+      register: nvm_version_output
+      changed_when: false
+
+    - name: Display NVM version
+      debug:
+        var: nvm_version_output.stdout_lines
+
+    - name: Verify default Node.js version
+      shell: |
+        source {{ nvm_install_dir }}/nvm.sh
+        nvm use --silent default
+        node --version
+      args:
+        executable: /bin/bash
+      register: node_version_output
+      changed_when: false
+
+    - name: Display Node.js version
+      debug:
+        var: node_version_output.stdout_lines
+
+    - name: Display NVM usage instructions
+      debug:
+        msg:
+          - "NVM has been installed successfully!"
+          - "To use NVM, run: source /etc/profile.d/nvm.sh"
+          - "Install Node.js versions with: nvm install <version>"
+          - "List available versions with: nvm ls-remote"
+          - "Switch versions with: nvm use <version>"

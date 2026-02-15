@@ -1,0 +1,61 @@
+---
+- name: Install Microsoft OpenJDK 21
+  hosts: all
+  become: yes
+  vars:
+    java_version: "21"
+    microsoft_jdk_url: "https://aka.ms/download-jdk/microsoft-jdk-21.0.5-linux-x64.tar.gz"
+    install_dir: "/usr/lib/jvm"
+
+  tasks:
+    - name: Install wget
+      apt:
+        name: wget
+        state: present
+
+    - name: Create JVM directory
+      file:
+        path: "{{ install_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download Microsoft OpenJDK
+      get_url:
+        url: "{{ microsoft_jdk_url }}"
+        dest: "/tmp/microsoft-jdk-21.tar.gz"
+        mode: '0644'
+        timeout: 300
+
+    - name: Extract Microsoft OpenJDK
+      unarchive:
+        src: "/tmp/microsoft-jdk-21.tar.gz"
+        dest: "{{ install_dir }}"
+        remote_src: yes
+        creates: "{{ install_dir }}/jdk-21.0.5+11"
+
+    - name: Rename extracted directory
+      command: mv {{ install_dir }}/jdk-21.0.5+11 {{ install_dir }}/msopenjdk-21
+      args:
+        creates: "{{ install_dir }}/msopenjdk-21"
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/microsoft-jdk-21.tar.gz"
+        state: absent
+
+    - name: Set JAVA_HOME environment variable
+      copy:
+        dest: /etc/profile.d/microsoft_jdk.sh
+        content: |
+          export JAVA_HOME={{ install_dir }}/msopenjdk-21
+          export PATH=$JAVA_HOME/bin:$PATH
+        mode: '0644'
+
+    - name: Verify Java installation
+      command: "{{ install_dir }}/msopenjdk-21/bin/java -version"
+      register: java_version_output
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        var: java_version_output.stderr_lines
