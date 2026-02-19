@@ -1,0 +1,100 @@
+---
+- name: Create Self-Signed SSL Certificate for Nginx
+  hosts: all
+  become: yes
+  vars:
+    domain_name: "demo.ganjianping.com"
+    ssl_certificate_dir: "/etc/ssl/certs"
+    ssl_private_key_dir: "/etc/ssl/private"
+    certificate_validity_days: 365
+    country: "SG"
+    state: "Singapore"
+    locality: "Singapore"
+    organization: "GJP"
+    organizational_unit: "IT"
+    email: "ganjianping1984@gmail.com"
+
+  tasks:
+    - name: Install OpenSSL
+      apt:
+        name: openssl
+        state: present
+
+    - name: Ensure SSL certificate directory exists
+      file:
+        path: "{{ ssl_certificate_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure SSL private key directory exists
+      file:
+        path: "{{ ssl_private_key_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Generate private key
+      command: >
+        openssl genrsa
+        -out {{ ssl_private_key_dir }}/{{ domain_name }}.key
+        2048
+      args:
+        creates: "{{ ssl_private_key_dir }}/{{ domain_name }}.key"
+
+    - name: Set private key permissions
+      file:
+        path: "{{ ssl_private_key_dir }}/{{ domain_name }}.key"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Generate self-signed SSL certificate
+      command: >
+        openssl req -new -x509
+        -key {{ ssl_private_key_dir }}/{{ domain_name }}.key
+        -out {{ ssl_certificate_dir }}/{{ domain_name }}.crt
+        -days {{ certificate_validity_days }}
+        -subj "/C={{ country }}/ST={{ state }}/L={{ locality }}/O={{ organization }}/OU={{ organizational_unit }}/CN={{ domain_name }}/emailAddress={{ email }}"
+        -addext "subjectAltName=DNS:{{ domain_name }},DNS:*.{{ domain_name }}"
+      args:
+        creates: "{{ ssl_certificate_dir }}/{{ domain_name }}.crt"
+
+    - name: Set certificate permissions
+      file:
+        path: "{{ ssl_certificate_dir }}/{{ domain_name }}.crt"
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Verify certificate
+      command: >
+        openssl x509 -in {{ ssl_certificate_dir }}/{{ domain_name }}.crt
+        -noout -text
+      register: cert_info
+      changed_when: false
+
+    - name: Display certificate information
+      debug:
+        msg:
+          - "Self-signed SSL certificate created successfully!"
+          - "Domain: {{ domain_name }}"
+          - "Certificate: {{ ssl_certificate_dir }}/{{ domain_name }}.crt"
+          - "Private Key: {{ ssl_private_key_dir }}/{{ domain_name }}.key"
+          - "Valid for: {{ certificate_validity_days }} days"
+          - ""
+          - "Add these lines to your Nginx server block:"
+          - "  ssl_certificate {{ ssl_certificate_dir }}/{{ domain_name }}.crt;"
+          - "  ssl_certificate_key {{ ssl_private_key_dir }}/{{ domain_name }}.key;"
+          - ""
+          - "WARNING: Self-signed certificates will show security warnings in browsers."
+          - "For production, use Let's Encrypt or a trusted CA certificate."
+
+    - name: Check certificate expiry date
+      shell: >
+        openssl x509 -in {{ ssl_certificate_dir }}/{{ domain_name }}.crt
+        -noout -enddate | cut -d= -f2
+      register: cert_expiry
+      changed_when: false
+
+    - name: Display certificate expiry
+      debug:
+        msg: "Certificate expires on: {{ cert_expiry.stdout }}"

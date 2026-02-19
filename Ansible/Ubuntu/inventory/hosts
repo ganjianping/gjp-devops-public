@@ -3,7 +3,7 @@
 # Consider using ansible-vault or dynamic inventory
 
 [ubuntu]
-13.214.159.84
+18.138.226.179
 
 [ubuntu:vars]
 ansible_ssh_user=ubuntu

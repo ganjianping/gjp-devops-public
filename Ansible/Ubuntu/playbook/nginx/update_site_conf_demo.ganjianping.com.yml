@@ -1,0 +1,54 @@
+---
+- name: Update Nginx Site Configuration for demo.ganjianping.com
+  hosts: all
+  become: yes
+  vars:
+    domain_name: "demo.ganjianping.com"
+    site_config_file: "demo.ganjianping.com.conf"
+    local_config_path: "{{ playbook_dir }}/../../files/nginx/etc/nginx/sites-available/{{ site_config_file }}"
+    remote_sites_available: "/etc/nginx/sites-available"
+    remote_sites_enabled: "/etc/nginx/sites-enabled"
+
+  tasks:
+    - name: Backup current configuration
+      copy:
+        src: "{{ remote_sites_available }}/{{ site_config_file }}"
+        dest: "{{ remote_sites_available }}/{{ site_config_file }}.backup.{{ ansible_facts['date_time']['epoch'] }}"
+        remote_src: yes
+        mode: '0644'
+      ignore_errors: yes
+
+    - name: Copy updated site configuration to sites-available
+      copy:
+        src: "{{ local_config_path }}"
+        dest: "{{ remote_sites_available }}/{{ site_config_file }}"
+        mode: '0644'
+        owner: root
+        group: root
+      register: config_updated
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+      failed_when: nginx_test.rc != 0
+
+    - name: Display Nginx test result
+      debug:
+        var: nginx_test.stderr_lines
+
+    - name: Reload Nginx if configuration is valid
+      systemd:
+        name: nginx
+        state: reloaded
+      when: config_updated.changed
+
+    - name: Display update status
+      debug:
+        msg:
+          - "Configuration update completed!"
+          - "Domain: {{ domain_name }}"
+          - "Configuration file: {{ remote_sites_available }}/{{ site_config_file }}"
+          - "Status: {{ 'Updated and reloaded' if config_updated.changed else 'No changes detected' }}"
+          - ""
+          - "Backup saved as: {{ site_config_file }}.backup.{{ ansible_facts['date_time']['epoch'] }}"

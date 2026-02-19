@@ -1,0 +1,114 @@
+---
+- name: Deploy Nginx Site Configuration for demo.ganjianping.com
+  hosts: all
+  become: yes
+  vars:
+    domain_name: "demo.ganjianping.com"
+    site_config_file: "demo.ganjianping.com.conf"
+    local_config_path: "{{ playbook_dir }}/../../files/nginx/etc/nginx/sites-available/{{ site_config_file }}"
+    remote_sites_available: "/etc/nginx/sites-available"
+    remote_sites_enabled: "/etc/nginx/sites-enabled"
+    web_root: "/var/www/{{ domain_name }}"
+
+  tasks:
+    - name: Create web root directory
+      file:
+        path: "{{ web_root }}"
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: Create admin directory
+      file:
+        path: "{{ web_root }}/admin"
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: Create resources directory
+      file:
+        path: "{{ web_root }}/resources"
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: Create placeholder index.html
+      copy:
+        dest: "{{ web_root }}/index.html"
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>{{ domain_name }}</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 50px; }
+                  h1 { color: #333; }
+                  .info { background: #f0f0f0; padding: 20px; border-radius: 5px; }
+              </style>
+          </head>
+          <body>
+              <h1>Welcome to {{ domain_name }}</h1>
+              <div class="info">
+                  <p>Nginx is successfully configured with HTTPS!</p>
+                  <p>This is a placeholder page. Replace this with your actual content.</p>
+              </div>
+          </body>
+          </html>
+        mode: '0644'
+        owner: www-data
+        group: www-data
+        force: no
+
+    - name: Copy site configuration to sites-available
+      copy:
+        src: "{{ local_config_path }}"
+        dest: "{{ remote_sites_available }}/{{ site_config_file }}"
+        mode: '0644'
+        owner: root
+        group: root
+        backup: yes
+      notify: Reload Nginx
+
+    - name: Remove default site if enabled
+      file:
+        path: "{{ remote_sites_enabled }}/default"
+        state: absent
+      notify: Reload Nginx
+
+    - name: Enable site by creating symbolic link
+      file:
+        src: "{{ remote_sites_available }}/{{ site_config_file }}"
+        dest: "{{ remote_sites_enabled }}/{{ site_config_file }}"
+        state: link
+      notify: Reload Nginx
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Display Nginx test result
+      debug:
+        var: nginx_test.stderr_lines
+
+  handlers:
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Display deployment success message
+      debug:
+        msg:
+          - "Site configuration deployed successfully!"
+          - "Domain: {{ domain_name }}"
+          - "Configuration: {{ remote_sites_available }}/{{ site_config_file }}"
+          - "Test your site:"
+          - "  HTTP:  http://{{ domain_name }}"
+          - "  HTTPS: https://{{ domain_name }}"
+          - ""
+          - "Note: Self-signed certificate will show browser warning."
+          - "Add exception in browser to proceed."
