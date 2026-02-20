@@ -1,0 +1,2 @@
+---
+- import_playbook: nginx/update_site_conf_demo.ganjianping.com.yml

@@ -1,0 +1,192 @@
+---
+# Ansible Playbook: Install Apache Tomcat 11
+# Description: Installs Apache Tomcat 11 on Ubuntu servers
+# Target: Ubuntu servers
+# Requirements: Java 21 or later
+
+- name: Install Apache Tomcat 11
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    tomcat_version: "11.0.2"
+    tomcat_major_version: "11"
+    tomcat_install_path: "/opt/tomcat"
+    tomcat_user: "tomcat"
+    tomcat_group: "tomcat"
+    tomcat_port: "8080"
+    java_version: "21"
+
+  tasks:
+    - name: Update apt cache to avoid stale package versions
+      command: apt-get update
+      changed_when: false
+      tags: ['tomcat']
+
+    - name: Install Java {{ java_version }} (required for Tomcat 11)
+      apt:
+        name: openjdk-{{ java_version }}-jdk
+        state: present
+      tags: ['tomcat', 'java']
+
+    - name: Create tomcat group
+      group:
+        name: "{{ tomcat_group }}"
+        state: present
+      tags: ['tomcat']
+
+    - name: Create tomcat user
+      user:
+        name: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        home: "{{ tomcat_install_path }}"
+        shell: /bin/false
+        system: true
+        create_home: false
+      tags: ['tomcat']
+
+    - name: Check if Tomcat is already installed
+      stat:
+        path: "{{ tomcat_install_path }}/bin/version.sh"
+      register: tomcat_installed
+      tags: ['tomcat']
+
+    - name: Download Apache Tomcat {{ tomcat_version }}
+      get_url:
+        url: "https://archive.apache.org/dist/tomcat/tomcat-{{ tomcat_major_version }}/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        mode: '0644'
+      when: not tomcat_installed.stat.exists
+      tags: ['tomcat']
+
+    - name: Create Tomcat installation directory
+      file:
+        path: "{{ tomcat_install_path }}"
+        state: directory
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: '0755'
+      tags: ['tomcat']
+
+    - name: Extract Tomcat archive
+      unarchive:
+        src: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "{{ tomcat_install_path }}"
+        remote_src: true
+        extra_opts: [--strip-components=1]
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+      when: not tomcat_installed.stat.exists
+      tags: ['tomcat']
+
+    - name: Set execute permissions on Tomcat scripts
+      file:
+        path: "{{ tomcat_install_path }}/bin"
+        state: directory
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: '0755'
+        recurse: true
+      tags: ['tomcat']
+
+    - name: Make shell scripts executable
+      shell: chmod +x {{ tomcat_install_path }}/bin/*.sh
+      args:
+        executable: /bin/bash
+      changed_when: false
+      tags: ['tomcat']
+
+    - name: Create Tomcat systemd service file
+      copy:
+        content: |
+          [Unit]
+          Description=Apache Tomcat {{ tomcat_major_version }} Web Application Container
+          After=network.target
+
+          [Service]
+          Type=forking
+
+          User={{ tomcat_user }}
+          Group={{ tomcat_group }}
+
+          Environment="JAVA_HOME=/usr/lib/jvm/java-{{ java_version }}-openjdk-amd64"
+          Environment="CATALINA_HOME={{ tomcat_install_path }}"
+          Environment="CATALINA_BASE={{ tomcat_install_path }}"
+          Environment="CATALINA_PID={{ tomcat_install_path }}/temp/tomcat.pid"
+          Environment="CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC"
+
+          ExecStart={{ tomcat_install_path }}/bin/startup.sh
+          ExecStop={{ tomcat_install_path }}/bin/shutdown.sh
+
+          Restart=on-failure
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/tomcat.service
+        mode: '0644'
+      notify: Reload systemd
+      tags: ['tomcat', 'systemd']
+
+    - name: Enable Tomcat service
+      systemd:
+        name: tomcat
+        enabled: true
+        daemon_reload: true
+      tags: ['tomcat', 'systemd']
+
+    - name: Start Tomcat service
+      systemd:
+        name: tomcat
+        state: started
+      tags: ['tomcat', 'systemd']
+
+    - name: Wait for Tomcat to start
+      wait_for:
+        port: "{{ tomcat_port }}"
+        delay: 5
+        timeout: 60
+      tags: ['tomcat']
+
+    - name: Get Tomcat version
+      command: "{{ tomcat_install_path }}/bin/version.sh"
+      register: tomcat_version_output
+      changed_when: false
+      tags: ['tomcat']
+
+    - name: Display Tomcat version
+      debug:
+        msg: "{{ tomcat_version_output.stdout_lines }}"
+      tags: ['tomcat']
+
+    - name: Get server IP address
+      set_fact:
+        server_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+      tags: ['tomcat']
+
+    - name: Display Tomcat information
+      debug:
+        msg:
+          - "Tomcat {{ tomcat_version }} installed successfully!"
+          - "Installation directory: {{ tomcat_install_path }}"
+          - "Service: tomcat.service"
+          - "Access URL: http://{{ server_ip }}:{{ tomcat_port }}"
+          - "Manager URL: http://{{ server_ip }}:{{ tomcat_port }}/manager/html"
+          - "Web applications directory: {{ tomcat_install_path }}/webapps"
+          - "Configuration: {{ tomcat_install_path }}/conf/server.xml"
+          - "Logs: {{ tomcat_install_path }}/logs/"
+          - ""
+          - "Note: Configure manager users in {{ tomcat_install_path }}/conf/tomcat-users.xml"
+      tags: ['tomcat']
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        state: absent
+      tags: ['tomcat', 'cleanup']
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true

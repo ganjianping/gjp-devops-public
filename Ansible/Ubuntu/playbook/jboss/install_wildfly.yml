@@ -1,0 +1,234 @@
+---
+# Ansible Playbook: Install WildFly 39
+# Description: Installs WildFly 39 Application Server on Ubuntu servers
+# Target: Ubuntu servers
+# Requirements: Java 21 or later
+
+- name: Install WildFly 39
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    wildfly_version: "39.0.0.Final"
+    wildfly_major_version: "39"
+    wildfly_install_path: "/opt/wildfly"
+    wildfly_user: "wildfly"
+    wildfly_group: "wildfly"
+    wildfly_http_port: "8080"
+    wildfly_management_port: "9990"
+    java_version: "21"
+    wildfly_admin_user: "admin"
+    wildfly_admin_password: "Admin@2026"
+
+  tasks:
+    - name: Create wildfly group
+      group:
+        name: "{{ wildfly_group }}"
+        state: present
+      tags: ['wildfly']
+
+    - name: Create wildfly user
+      user:
+        name: "{{ wildfly_user }}"
+        group: "{{ wildfly_group }}"
+        home: "{{ wildfly_install_path }}"
+        shell: /bin/false
+        system: true
+        create_home: false
+      tags: ['wildfly']
+
+    - name: Check if WildFly is already installed
+      stat:
+        path: "{{ wildfly_install_path }}/bin/standalone.sh"
+      register: wildfly_installed
+      tags: ['wildfly']
+
+    - name: Download WildFly {{ wildfly_version }}
+      get_url:
+        url: "https://github.com/wildfly/wildfly/releases/download/{{ wildfly_version }}/wildfly-{{ wildfly_version }}.tar.gz"
+        dest: "/tmp/wildfly-{{ wildfly_version }}.tar.gz"
+        mode: '0644'
+      when: not wildfly_installed.stat.exists
+      tags: ['wildfly']
+
+    - name: Create WildFly installation directory
+      file:
+        path: "{{ wildfly_install_path }}"
+        state: directory
+        owner: "{{ wildfly_user }}"
+        group: "{{ wildfly_group }}"
+        mode: '0755'
+      tags: ['wildfly']
+
+    - name: Extract WildFly archive
+      unarchive:
+        src: "/tmp/wildfly-{{ wildfly_version }}.tar.gz"
+        dest: "{{ wildfly_install_path }}"
+        remote_src: true
+        extra_opts: [--strip-components=1]
+        owner: "{{ wildfly_user }}"
+        group: "{{ wildfly_group }}"
+      when: not wildfly_installed.stat.exists
+      tags: ['wildfly']
+
+    - name: Set ownership of WildFly directory
+      file:
+        path: "{{ wildfly_install_path }}"
+        owner: "{{ wildfly_user }}"
+        group: "{{ wildfly_group }}"
+        recurse: true
+      tags: ['wildfly']
+
+    - name: Create WildFly configuration directory
+      file:
+        path: /etc/wildfly
+        state: directory
+        mode: '0755'
+      tags: ['wildfly']
+
+    - name: Create WildFly configuration file
+      copy:
+        content: |
+          # WildFly configuration file
+          WILDFLY_HOME="{{ wildfly_install_path }}"
+          WILDFLY_USER="{{ wildfly_user }}"
+          WILDFLY_MODE=standalone
+          WILDFLY_CONFIG=standalone.xml
+          WILDFLY_BIND=0.0.0.0
+          WILDFLY_CONSOLE_LOG=/var/log/wildfly/console.log
+          JAVA_HOME=/usr/lib/jvm/java-{{ java_version }}-openjdk-amd64
+          JAVA_OPTS="-Xms512m -Xmx1024m -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=512m"
+        dest: /etc/wildfly/wildfly.conf
+        mode: '0644'
+      tags: ['wildfly']
+
+    - name: Create WildFly log directory
+      file:
+        path: /var/log/wildfly
+        state: directory
+        owner: "{{ wildfly_user }}"
+        group: "{{ wildfly_group }}"
+        mode: '0755'
+      tags: ['wildfly']
+
+    - name: Create WildFly systemd service file
+      copy:
+        content: |
+          [Unit]
+          Description=WildFly {{ wildfly_major_version }} Application Server
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ wildfly_user }}
+          Group={{ wildfly_group }}
+          
+          EnvironmentFile=/etc/wildfly/wildfly.conf
+          
+          ExecStart={{ wildfly_install_path }}/bin/standalone.sh -b $WILDFLY_BIND -bmanagement $WILDFLY_BIND -c $WILDFLY_CONFIG
+          ExecStop={{ wildfly_install_path }}/bin/jboss-cli.sh --connect command=:shutdown
+          
+          Restart=on-failure
+          RestartSec=10
+          
+          StandardOutput=journal
+          StandardError=journal
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/wildfly.service
+        mode: '0644'
+      notify: Reload systemd
+      tags: ['wildfly', 'systemd']
+
+    - name: Enable WildFly service
+      systemd:
+        name: wildfly
+        enabled: true
+        daemon_reload: true
+      tags: ['wildfly', 'systemd']
+
+    - name: Start WildFly service
+      systemd:
+        name: wildfly
+        state: started
+      tags: ['wildfly', 'systemd']
+
+    - name: Wait for WildFly to start
+      wait_for:
+        port: "{{ wildfly_http_port }}"
+        delay: 10
+        timeout: 120
+      tags: ['wildfly']
+
+    - name: Stop WildFly service to add management user
+      systemd:
+        name: wildfly
+        state: stopped
+      tags: ['wildfly']
+
+    - name: Add WildFly management user
+      shell: |
+        {{ wildfly_install_path }}/bin/add-user.sh -u {{ wildfly_admin_user }} -p {{ wildfly_admin_password }} -r ManagementRealm -s
+      args:
+        executable: /bin/bash
+      tags: ['wildfly']
+
+    - name: Start WildFly service after adding user
+      systemd:
+        name: wildfly
+        state: started
+      tags: ['wildfly']
+
+    - name: Wait for WildFly management port to be ready
+      wait_for:
+        port: "{{ wildfly_management_port }}"
+        delay: 10
+        timeout: 60
+      tags: ['wildfly']
+
+    - name: Get WildFly version
+      shell: |
+        {{ wildfly_install_path }}/bin/standalone.sh --version 2>&1 | head -n 1
+      register: wildfly_version_output
+      changed_when: false
+      tags: ['wildfly']
+
+    - name: Get server IP address
+      set_fact:
+        server_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+      tags: ['wildfly']
+
+    - name: Display WildFly information
+      debug:
+        msg:
+          - "WildFly {{ wildfly_version }} installed successfully!"
+          - "Installation directory: {{ wildfly_install_path }}"
+          - "Configuration: /etc/wildfly/wildfly.conf"
+          - "Service: wildfly.service"
+          - "Logs: /var/log/wildfly/ and {{ wildfly_install_path }}/standalone/log/"
+          - ""
+          - "Application URL: http://{{ server_ip }}:{{ wildfly_http_port }}"
+          - "Management Console: http://{{ server_ip }}:{{ wildfly_management_port }}/console"
+          - ""
+          - "Management User: {{ wildfly_admin_user }}"
+          - "Management Password: {{ wildfly_admin_password }}"
+          - ""
+          - "Deployments directory: {{ wildfly_install_path }}/standalone/deployments"
+          - "Configuration file: {{ wildfly_install_path }}/standalone/configuration/standalone.xml"
+          - ""
+          - "Note: Management console is accessible from any interface (0.0.0.0)"
+          - "Warning: In production, restrict management access using firewall rules"
+      tags: ['wildfly']
+
+    - name: Clean up downloaded archive
+      file:
+        path: "/tmp/wildfly-{{ wildfly_version }}.tar.gz"
+        state: absent
+      tags: ['wildfly', 'cleanup']
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true

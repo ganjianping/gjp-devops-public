@@ -1,0 +1,3 @@
+---
+- import_playbook: nginx/create_ssl_certificate_demo.ganjianping.com.yml
+- import_playbook: nginx/deploy_site_conf_demo.ganjianping.com.yml

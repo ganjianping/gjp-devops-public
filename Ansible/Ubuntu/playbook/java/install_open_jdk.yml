@@ -12,6 +12,11 @@
     jdk_version: "21" # 8, 11, 17, or 21 
 
   tasks:
+    - name: Update apt cache to avoid stale package versions
+      command: apt-get update
+      changed_when: false
+      tags: ['jdk']
+
     - name: Install OpenJDK {{ jdk_version }}
       apt:
         name: openjdk-{{ jdk_version }}-jdk

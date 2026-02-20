@@ -1,0 +1,48 @@
+---
+- name: Install Apache2 from Ubuntu Repository
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      command: apt-get update
+      changed_when: false
+
+    - name: Install Apache2
+      apt:
+        name: apache2
+        state: present
+
+    - name: Enable Apache2 service
+      systemd:
+        name: apache2
+        enabled: yes
+        state: started
+
+    - name: Verify Apache2 installation
+      command: apache2 -v
+      register: apache_version_output
+      changed_when: false
+
+    - name: Display Apache2 version
+      debug:
+        var: apache_version_output.stdout_lines
+
+    - name: Check Apache2 service status
+      systemd:
+        name: apache2
+      register: apache_status
+
+    - name: Display Apache2 service status
+      debug:
+        msg: "Apache2 service is {{ apache_status.status.ActiveState }}"
+
+    - name: Display Apache2 information
+      debug:
+        msg:
+          - "Apache2 installed successfully!"
+          - "Default web root: /var/www/html"
+          - "Configuration: /etc/apache2/apache2.conf"
+          - "Sites available: /etc/apache2/sites-available/"
+          - "Sites enabled: /etc/apache2/sites-enabled/"
+          - "Test your server: http://{{ ansible_facts['default_ipv4']['address'] }}"

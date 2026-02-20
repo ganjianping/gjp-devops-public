@@ -1,5 +1,6 @@
 ---
-- import_playbook: install_common.yml
+# - import_playbook: other/install_common.yml
+# - import_playbook: other/install_docker.yml
 
 # - import_playbook: python/install_python_pip.yml
 # - import_playbook: python/install_uv.yml
@@ -18,6 +19,10 @@
 # - import_playbook: nodejs/install_node.yml
 # - import_playbook: nodejs/install_nvm.yml
 
-- import_playbook: nginx/install_nginx.yml
+# - import_playbook: nginx/install_nginx.yml
 
-# - import_playbook: install_docker.yml
+# - import_playbook: apache/install_tomcat.yml
+# - import_playbook: apache/install_apache.yml
+
+- import_playbook: jboss/install_wildfly.yml
+
