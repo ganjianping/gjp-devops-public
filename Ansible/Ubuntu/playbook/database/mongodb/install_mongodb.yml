@@ -95,7 +95,7 @@
           - db: admin
             role: readWriteAnyDatabase
           - db: admin
-            role: dbAdminAnyDatabase
+            role: dbAdminAnyDatabasemao
           - db: admin
             role: clusterAdmin
         state: present

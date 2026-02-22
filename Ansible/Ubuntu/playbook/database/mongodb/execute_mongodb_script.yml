@@ -1,0 +1,49 @@
+---
+# Ansible Playbook: Create MongoDB Sample Database and Collections
+# Description: Creates a sample database and a collection with all MongoDB field types
+# Target: Ubuntu servers
+
+- name: Create MongoDB Sample Database and Collections
+  hosts: ubuntu
+  become: true
+  gather_facts: false
+
+  vars:
+    mongodb_admin_user: "admin"
+    mongodb_admin_password: "admin2026!"
+    mongodb_host: "127.0.0.1"
+    mongodb_port: 27017
+    js_scripts:
+      - "{{ playbook_dir }}/../../../files/mongodb/sample_db_collections.js"
+      # Add more JS files here as needed
+      # - "{{ playbook_dir }}/../../../files/mongodb/another_script.js"
+
+  tasks:
+    - name: Ensure remote temporary directory exists
+      file:
+        path: /tmp/mongodb_scripts
+        state: directory
+        mode: '0755'
+      tags: ['mongodb', 'script']
+
+    - name: Copy JS scripts to target server
+      copy:
+        src: "{{ item }}"
+        dest: "/tmp/mongodb_scripts/{{ item | basename }}"
+        mode: '0644'
+      loop: "{{ js_scripts }}"
+      tags: ['mongodb', 'script']
+
+    - name: Execute JS scripts to create sample DB and collection
+      shell: >
+        mongosh "mongodb://{{ mongodb_admin_user }}:{{ mongodb_admin_password }}@{{ mongodb_host }}:{{ mongodb_port }}/admin"
+        --file /tmp/mongodb_scripts/{{ item | basename }}
+      loop: "{{ js_scripts }}"
+      tags: ['mongodb', 'script']
+
+    - name: Clean up temporary JS scripts
+      file:
+        path: "/tmp/mongodb_scripts/{{ item | basename }}"
+        state: absent
+      loop: "{{ js_scripts }}"
+      tags: ['mongodb', 'script']
