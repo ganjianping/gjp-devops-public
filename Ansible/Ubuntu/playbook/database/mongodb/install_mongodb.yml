@@ -33,10 +33,11 @@
         state: present
       tags: ['mongodb']
 
-    - name: Install pymongo (required for Ansible MongoDB modules)
+    - name: Install pymongo 4+ (required for Ansible MongoDB modules)
       pip:
-        name: pymongo
+        name: pymongo>=4.0
         state: present
+        extra_args: "--break-system-packages"
       tags: ['mongodb']
 
     - name: Add MongoDB APT signing key
@@ -47,7 +48,7 @@
 
     - name: Add official MongoDB {{ mongodb_repo_version }} repository
       apt_repository:
-        repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_repo_version }} multiverse"
+        repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_facts['distribution_release'] }}/mongodb-org/{{ mongodb_repo_version }} multiverse"
         state: present
         filename: mongodb-org
       tags: ['mongodb']
@@ -83,6 +84,8 @@
       community.mongodb.mongodb_user:
         login_host: 127.0.0.1
         login_port: "{{ mongodb_port }}"
+        login_user: "{{ mongodb_admin_user }}"
+        login_password: "{{ mongodb_admin_password }}"
         database: admin
         name: "{{ mongodb_admin_user }}"
         password: "{{ mongodb_admin_password }}"
@@ -100,7 +103,7 @@
 
     - name: Configure mongod - bind IP and port
       template:
-        src: "{{ playbook_dir }}/../../files/mongodb/etc/mongod.conf.j2"
+        src: "{{ playbook_dir }}/../../../files/mongodb/etc/mongod.conf.j2"
         dest: "{{ mongodb_config_file }}"
         owner: root
         group: root
