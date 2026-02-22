@@ -42,7 +42,7 @@
 
     - name: Add official PostgreSQL {{ postgresql_version }} repository
       apt_repository:
-        repo: "deb https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        repo: "deb https://apt.postgresql.org/pub/repos/apt {{ ansible_facts['distribution_release'] }}-pgdg main"
         state: present
         filename: pgdg
       tags: ['postgresql']

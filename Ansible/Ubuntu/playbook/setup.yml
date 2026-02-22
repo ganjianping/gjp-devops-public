@@ -3,4 +3,5 @@
 # - import_playbook: nginx/deploy_site_conf_demo.ganjianping.com.yml
 
 # - import_playbook: database/mariadb/execute_mariadb_sqls.yml
-- import_playbook: database/mysql/execute_mysql_sqls.yml
+# - import_playbook: database/mysql/execute_mysql_sqls.yml
+- import_playbook: database/postgresql/execute_postgresql_sqls.yml

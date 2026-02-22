@@ -1,0 +1,56 @@
+---
+# Ansible Playbook: Execute PostgreSQL SQL Scripts
+# Description: Copies and executes multiple SQL scripts on the PostgreSQL server
+# Target: Ubuntu servers
+
+- name: Execute PostgreSQL SQL Scripts
+  hosts: ubuntu
+  become: true
+  gather_facts: false
+
+  vars:
+    postgresql_admin_user: "admin"
+    postgresql_admin_password: "admin2026!"
+    postgresql_host: "127.0.0.1"
+    postgresql_port: 5432
+    sql_scripts:
+      - file: "{{ playbook_dir }}/../../../files/postgresql/sample_db.sql"
+        db: "postgres"
+      - file: "{{ playbook_dir }}/../../../files/postgresql/sample_schema_tables.sql"
+        db: "sample_db"
+
+  tasks:
+    - name: Ensure remote temporary directory exists
+      file:
+        path: /tmp/postgresql_scripts
+        state: directory
+        mode: '0755'
+      tags: ['postgresql', 'sql']
+
+    - name: Copy SQL scripts to target server
+      copy:
+        src: "{{ item.file }}"
+        dest: "/tmp/postgresql_scripts/{{ item.file | basename }}"
+        mode: '0644'
+      loop: "{{ sql_scripts }}"
+      tags: ['postgresql', 'sql']
+
+    - name: Execute SQL scripts
+      shell: >
+        PGPASSWORD='{{ postgresql_admin_password }}' psql 
+        -h {{ postgresql_host }} 
+        -p {{ postgresql_port }} 
+        -U {{ postgresql_admin_user }} 
+        -d {{ item.db }} 
+        -f /tmp/postgresql_scripts/{{ item.file | basename }}
+      loop: "{{ sql_scripts }}"
+      # Ignore errors so that if the database already exists, it continues to the next script
+      ignore_errors: yes
+      tags: ['postgresql', 'sql']
+
+    - name: Clean up temporary SQL scripts
+      file:
+        path: "/tmp/postgresql_scripts/{{ item.file | basename }}"
+        state: absent
+      loop: "{{ sql_scripts }}"
+      tags: ['postgresql', 'sql']
