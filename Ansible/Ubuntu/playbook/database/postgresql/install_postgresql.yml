@@ -1,0 +1,142 @@
+---
+# Ansible Playbook: Install PostgreSQL 18
+# Description: Installs PostgreSQL 18.2 on Ubuntu servers using the official PGDG repository
+# Target: Ubuntu servers
+# Requirements: Ubuntu 20.04 / 22.04 / 24.04
+
+- name: Install PostgreSQL 18.2
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    postgresql_version: "18"
+    postgresql_admin_user: "admin"
+    postgresql_admin_password: "admin2026!"
+    postgresql_listen_addresses: "*"
+    postgresql_port: 5432
+    postgresql_config_dir: "/etc/postgresql/18/main"
+
+  tasks:
+    - name: Update apt cache
+      command: apt-get update
+      changed_when: false
+      tags: ['postgresql']
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - curl
+          - gnupg
+          - software-properties-common
+          - python3-psycopg2
+          - acl
+        state: present
+      tags: ['postgresql']
+
+    - name: Add PGDG APT signing key
+      apt_key:
+        url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+        state: present
+      tags: ['postgresql']
+
+    - name: Add official PostgreSQL {{ postgresql_version }} repository
+      apt_repository:
+        repo: "deb https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        state: present
+        filename: pgdg
+      tags: ['postgresql']
+
+    - name: Update apt cache after adding PGDG repository
+      command: apt-get update
+      changed_when: false
+      tags: ['postgresql']
+
+    - name: Install PostgreSQL {{ postgresql_version }}
+      apt:
+        name:
+          - postgresql-{{ postgresql_version }}
+          - postgresql-client-{{ postgresql_version }}
+          - postgresql-contrib-{{ postgresql_version }}
+        state: present
+      tags: ['postgresql']
+
+    - name: Enable and start PostgreSQL service
+      systemd:
+        name: postgresql
+        state: started
+        enabled: true
+        daemon_reload: true
+      tags: ['postgresql']
+
+    - name: Wait for PostgreSQL to be ready
+      wait_for:
+        port: "{{ postgresql_port }}"
+        host: 127.0.0.1
+        timeout: 30
+      tags: ['postgresql']
+
+    - name: Configure listen_addresses for remote access
+      lineinfile:
+        path: "{{ postgresql_config_dir }}/postgresql.conf"
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '{{ postgresql_listen_addresses }}'"
+        state: present
+      notify: Restart PostgreSQL
+      tags: ['postgresql']
+
+    - name: Configure port
+      lineinfile:
+        path: "{{ postgresql_config_dir }}/postgresql.conf"
+        regexp: "^#?port\\s*="
+        line: "port = {{ postgresql_port }}"
+        state: present
+      notify: Restart PostgreSQL
+      tags: ['postgresql']
+
+    - name: Allow remote IPv4 connections in pg_hba.conf
+      lineinfile:
+        path: "{{ postgresql_config_dir }}/pg_hba.conf"
+        line: "host    all             all             0.0.0.0/0               scram-sha-256"
+        state: present
+      notify: Restart PostgreSQL
+      tags: ['postgresql']
+
+    - name: Allow remote IPv6 connections in pg_hba.conf
+      lineinfile:
+        path: "{{ postgresql_config_dir }}/pg_hba.conf"
+        line: "host    all             all             ::/0                    scram-sha-256"
+        state: present
+      notify: Restart PostgreSQL
+      tags: ['postgresql']
+
+    - name: Flush handlers to restart PostgreSQL before creating users
+      meta: flush_handlers
+      tags: ['postgresql']
+
+    - name: Create admin role with remote login
+      postgresql_user:
+        login_unix_socket: /var/run/postgresql
+        name: "{{ postgresql_admin_user }}"
+        password: "{{ postgresql_admin_password }}"
+        role_attr_flags: "SUPERUSER,CREATEDB,CREATEROLE,LOGIN"
+        state: present
+      become_user: postgres
+      tags: ['postgresql']
+
+    - name: Print PostgreSQL version
+      command: psql --version
+      register: pg_ver
+      changed_when: false
+      tags: ['postgresql']
+
+    - name: Show installed PostgreSQL version
+      debug:
+        msg: "{{ pg_ver.stdout }}"
+      tags: ['postgresql']
+
+  handlers:
+    - name: Restart PostgreSQL
+      systemd:
+        name: postgresql
+        state: restarted

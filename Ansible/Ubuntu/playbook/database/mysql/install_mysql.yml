@@ -1,0 +1,183 @@
+---
+# Ansible Playbook: Install MySQL 9
+# Description: Installs MySQL 9.x on Ubuntu servers using the official MySQL APT repository
+# Target: Ubuntu servers
+# Requirements: Ubuntu 20.04 / 22.04 / 24.04
+
+- name: Install MySQL 9.x
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    mysql_repo_version: "9"
+    mysql_admin_user: "admin"
+    mysql_admin_password: "admin2026!"
+    mysql_bind_address: "0.0.0.0"
+    mysql_port: 3306
+    mysql_config_dir: "/etc/mysql/mysql.conf.d"
+
+  tasks:
+    - name: Update apt cache
+      command: apt-get update
+      changed_when: false
+      failed_when: false
+      tags: ['mysql']
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - curl
+          - gnupg
+          - software-properties-common
+          - python3-pymysql
+          - debconf-utils
+        state: present
+      tags: ['mysql']
+
+    - name: Download MySQL APT config package
+      get_url:
+        url: "https://repo.mysql.com/mysql-apt-config_0.8.33-1_all.deb"
+        dest: "/tmp/mysql-apt-config.deb"
+        mode: '0644'
+      tags: ['mysql']
+
+    - name: Pre-answer MySQL APT config debconf selections (select MySQL {{ mysql_repo_version }})
+      debconf:
+        name: mysql-apt-config
+        question: mysql-apt-config/select-server
+        value: "mysql-{{ mysql_repo_version }}-lts"
+        vtype: select
+      tags: ['mysql']
+
+    - name: Install MySQL APT config package
+      shell: |
+        DEBIAN_FRONTEND=noninteractive dpkg -i /tmp/mysql-apt-config.deb
+        curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2025 | gpg --batch --dearmor -o /usr/share/keyrings/mysql-apt-config.gpg.new
+        mv /usr/share/keyrings/mysql-apt-config.gpg.new /usr/share/keyrings/mysql-apt-config.gpg
+      args:
+        executable: /bin/bash
+      changed_when: true
+      tags: ['mysql']
+
+    - name: Update apt cache after adding MySQL repository
+      command: apt-get update
+      changed_when: false
+      tags: ['mysql']
+
+    - name: Pre-seed MySQL root password for unattended install
+      debconf:
+        name: mysql-community-server
+        question: "{{ item.question }}"
+        value: "{{ item.value }}"
+        vtype: "{{ item.vtype }}"
+      loop:
+        - { question: "mysql-community-server/root-pass",     value: "", vtype: password }
+        - { question: "mysql-community-server/re-root-pass",  value: "", vtype: password }
+        - { question: "mysql-community-server/default-auth-override", value: "Use Strong Password Encryption (RECOMMENDED)", vtype: select }
+      no_log: true
+      tags: ['mysql']
+
+    - name: Install MySQL server and client
+      apt:
+        name:
+          - mysql-server
+          - mysql-client
+        state: present
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      tags: ['mysql']
+
+    - name: Enable and start MySQL service
+      systemd:
+        name: mysql
+        state: started
+        enabled: true
+        daemon_reload: true
+      tags: ['mysql']
+
+    - name: Wait for MySQL to be ready
+      wait_for:
+        port: "{{ mysql_port }}"
+        host: 127.0.0.1
+        timeout: 30
+      tags: ['mysql']
+
+    - name: Remove anonymous MySQL users
+      mysql_user:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: root
+        name: ''
+        host_all: true
+        state: absent
+      ignore_errors: true
+      tags: ['mysql']
+
+    - name: Remove MySQL test database
+      mysql_db:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: root
+        name: test
+        state: absent
+      ignore_errors: true
+      tags: ['mysql']
+
+    - name: Disallow remote root login
+      mysql_user:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        login_user: root
+        name: root
+        host: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ ansible_hostname | default(inventory_hostname) }}"
+        - "127.0.0.1"
+        - "::1"
+        - "%"
+      ignore_errors: true
+      tags: ['mysql']
+
+    - name: Create admin user with remote access
+      shell: |
+        mysql --socket=/var/run/mysqld/mysqld.sock -u root <<'EOF'
+        CREATE USER IF NOT EXISTS '{{ mysql_admin_user }}'@'%' IDENTIFIED WITH caching_sha2_password BY '{{ mysql_admin_password }}';
+        ALTER USER '{{ mysql_admin_user }}'@'%' IDENTIFIED WITH caching_sha2_password BY '{{ mysql_admin_password }}' PASSWORD EXPIRE NEVER;
+        GRANT ALL PRIVILEGES ON *.* TO '{{ mysql_admin_user }}'@'%' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+        EOF
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+      tags: ['mysql']
+
+    - name: Configure MySQL bind address and port
+      ini_file:
+        path: "{{ mysql_config_dir }}/mysqld.cnf"
+        section: mysqld
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        mode: '0644'
+      loop:
+        - { option: 'bind-address',      value: '{{ mysql_bind_address }}' }
+        - { option: 'mysqlx-bind-address', value: '127.0.0.1' }
+        - { option: 'port',              value: '{{ mysql_port }}' }
+      notify: Restart MySQL
+      tags: ['mysql']
+
+    - name: Print MySQL version
+      command: mysql --version
+      register: mysql_ver
+      changed_when: false
+      tags: ['mysql']
+
+    - name: Show installed MySQL version
+      debug:
+        msg: "{{ mysql_ver.stdout }}"
+      tags: ['mysql']
+
+  handlers:
+    - name: Restart MySQL
+      systemd:
+        name: mysql
+        state: restarted

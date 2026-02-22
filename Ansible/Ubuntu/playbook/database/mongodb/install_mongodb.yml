@@ -1,0 +1,138 @@
+---
+# Ansible Playbook: Install MongoDB 8
+# Description: Installs MongoDB 8.0 (latest 8.x) on Ubuntu servers using the official MongoDB repository
+# Target: Ubuntu servers
+# Requirements: Ubuntu 20.04 / 22.04 / 24.04
+
+- name: Install MongoDB 8.0
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    mongodb_repo_version: "8.0"
+    mongodb_admin_user: "admin"
+    mongodb_admin_password: "admin2026!"
+    mongodb_bind_ip: "0.0.0.0"
+    mongodb_port: 27017
+    mongodb_config_file: "/etc/mongod.conf"
+
+  tasks:
+    - name: Update apt cache
+      command: apt-get update
+      changed_when: false
+      tags: ['mongodb']
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - curl
+          - gnupg
+          - software-properties-common
+          - python3-pip
+        state: present
+      tags: ['mongodb']
+
+    - name: Install pymongo (required for Ansible MongoDB modules)
+      pip:
+        name: pymongo
+        state: present
+      tags: ['mongodb']
+
+    - name: Add MongoDB APT signing key
+      apt_key:
+        url: "https://www.mongodb.org/static/pgp/server-{{ mongodb_repo_version }}.asc"
+        state: present
+      tags: ['mongodb']
+
+    - name: Add official MongoDB {{ mongodb_repo_version }} repository
+      apt_repository:
+        repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_repo_version }} multiverse"
+        state: present
+        filename: mongodb-org
+      tags: ['mongodb']
+
+    - name: Update apt cache after adding MongoDB repository
+      command: apt-get update
+      changed_when: false
+      tags: ['mongodb']
+
+    - name: Install MongoDB
+      apt:
+        name:
+          - mongodb-org
+        state: present
+      tags: ['mongodb']
+
+    - name: Enable and start mongod service
+      systemd:
+        name: mongod
+        state: started
+        enabled: true
+        daemon_reload: true
+      tags: ['mongodb']
+
+    - name: Wait for MongoDB to be ready
+      wait_for:
+        port: "{{ mongodb_port }}"
+        host: 127.0.0.1
+        timeout: 30
+      tags: ['mongodb']
+
+    - name: Create MongoDB admin user
+      community.mongodb.mongodb_user:
+        login_host: 127.0.0.1
+        login_port: "{{ mongodb_port }}"
+        database: admin
+        name: "{{ mongodb_admin_user }}"
+        password: "{{ mongodb_admin_password }}"
+        roles:
+          - db: admin
+            role: userAdminAnyDatabase
+          - db: admin
+            role: readWriteAnyDatabase
+          - db: admin
+            role: dbAdminAnyDatabase
+          - db: admin
+            role: clusterAdmin
+        state: present
+      tags: ['mongodb']
+
+    - name: Configure mongod - bind IP and port
+      template:
+        src: "{{ playbook_dir }}/../../files/mongodb/etc/mongod.conf.j2"
+        dest: "{{ mongodb_config_file }}"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart MongoDB
+      tags: ['mongodb']
+
+    - name: Flush handlers to apply config before final check
+      meta: flush_handlers
+      tags: ['mongodb']
+
+    - name: Wait for MongoDB to be ready after config change
+      wait_for:
+        port: "{{ mongodb_port }}"
+        host: 127.0.0.1
+        timeout: 30
+      tags: ['mongodb']
+
+    - name: Print MongoDB version
+      command: mongod --version
+      register: mongo_ver
+      changed_when: false
+      tags: ['mongodb']
+
+    - name: Show installed MongoDB version
+      debug:
+        msg: "{{ mongo_ver.stdout_lines[0] }}"
+      tags: ['mongodb']
+
+  handlers:
+    - name: Restart MongoDB
+      systemd:
+        name: mongod
+        state: restarted

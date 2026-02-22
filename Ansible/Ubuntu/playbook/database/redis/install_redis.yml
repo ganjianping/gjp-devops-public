@@ -1,0 +1,118 @@
+---
+# Ansible Playbook: Install Redis 8
+# Description: Installs Redis 8.0 on Ubuntu servers using the official Redis repository
+# Target: Ubuntu servers
+# Requirements: Ubuntu 20.04 / 22.04 / 24.04
+
+- name: Install Redis 8.0
+  hosts: ubuntu
+  become: true
+  gather_facts: true
+
+  vars:
+    redis_version: "8"
+    redis_bind_address: "0.0.0.0"
+    redis_port: 6379
+    redis_password: "redis2026!"
+    redis_maxmemory: "256mb"
+    redis_maxmemory_policy: "allkeys-lru"
+    redis_config_file: "/etc/redis/redis.conf"
+
+  tasks:
+    - name: Update apt cache
+      command: apt-get update
+      changed_when: false
+      tags: ['redis']
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - curl
+          - gnupg
+          - software-properties-common
+        state: present
+      tags: ['redis']
+
+    - name: Add Redis APT signing key
+      apt_key:
+        url: "https://packages.redis.io/gpg"
+        state: present
+      tags: ['redis']
+
+    - name: Add official Redis {{ redis_version }} repository
+      apt_repository:
+        repo: "deb https://packages.redis.io/deb {{ ansible_distribution_release }} main"
+        state: present
+        filename: redis
+      tags: ['redis']
+
+    - name: Update apt cache after adding Redis repository
+      command: apt-get update
+      changed_when: false
+      tags: ['redis']
+
+    - name: Install Redis server
+      apt:
+        name:
+          - redis
+        state: present
+      tags: ['redis']
+
+    - name: Configure Redis (bind, port, password, memory)
+      template:
+        src: "{{ playbook_dir }}/../../files/redis/etc/redis/redis.conf.j2"
+        dest: "{{ redis_config_file }}"
+        owner: redis
+        group: redis
+        mode: '0640'
+        backup: true
+      notify: Restart Redis
+      tags: ['redis']
+
+    - name: Flush handlers to apply config
+      meta: flush_handlers
+      tags: ['redis']
+
+    - name: Enable and start Redis service
+      systemd:
+        name: redis-server
+        state: started
+        enabled: true
+        daemon_reload: true
+      tags: ['redis']
+
+    - name: Wait for Redis to be ready
+      wait_for:
+        port: "{{ redis_port }}"
+        host: 127.0.0.1
+        timeout: 30
+      tags: ['redis']
+
+    - name: Verify Redis is responding (PING)
+      command: redis-cli -a "{{ redis_password }}" -p "{{ redis_port }}" PING
+      register: redis_ping
+      changed_when: false
+      no_log: true
+      tags: ['redis']
+
+    - name: Show Redis PING response
+      debug:
+        msg: "Redis responded: {{ redis_ping.stdout }}"
+      tags: ['redis']
+
+    - name: Print Redis version
+      command: redis-server --version
+      register: redis_ver
+      changed_when: false
+      tags: ['redis']
+
+    - name: Show installed Redis version
+      debug:
+        msg: "{{ redis_ver.stdout }}"
+      tags: ['redis']
+
+  handlers:
+    - name: Restart Redis
+      systemd:
+        name: redis-server
+        state: restarted

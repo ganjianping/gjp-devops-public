@@ -1,0 +1,51 @@
+---
+# Ansible Playbook: Execute MariaDB SQL Scripts
+# Description: Copies and executes multiple SQL scripts on the MariaDB server
+# Target: Ubuntu servers
+
+- name: Execute MariaDB SQL Scripts
+  hosts: ubuntu
+  become: true
+  gather_facts: false
+
+  vars:
+    mariadb_admin_user: "admin"
+    mariadb_admin_password: "admin2026!"
+    sql_scripts:
+      - "files/mariadb/sample_db_tables.sql"
+      # Add more SQL files here as needed
+      # - "files/mariadb/another_script.sql"
+
+  tasks:
+    - name: Ensure remote temporary directory exists
+      file:
+        path: /tmp/mariadb_scripts
+        state: directory
+        mode: '0755'
+      tags: ['mariadb', 'sql']
+
+    - name: Copy SQL scripts to target server
+      copy:
+        src: "{{ item }}"
+        dest: "/tmp/mariadb_scripts/{{ item | basename }}"
+        mode: '0644'
+      loop: "{{ sql_scripts }}"
+      tags: ['mariadb', 'sql']
+
+    - name: Execute SQL scripts
+      mysql_db:
+        login_user: "{{ mariadb_admin_user }}"
+        login_password: "{{ mariadb_admin_password }}"
+        login_host: "127.0.0.1"
+        state: import
+        name: all
+        target: "/tmp/mariadb_scripts/{{ item | basename }}"
+      loop: "{{ sql_scripts }}"
+      tags: ['mariadb', 'sql']
+
+    - name: Clean up temporary SQL scripts
+      file:
+        path: "/tmp/mariadb_scripts/{{ item | basename }}"
+        state: absent
+      loop: "{{ sql_scripts }}"
+      tags: ['mariadb', 'sql']
