@@ -28,5 +28,5 @@
 # - import_playbook: database/mariadb/install_mariadb.yml
 # - import_playbook: database/mysql/install_mysql.yml
 # - import_playbook: database/postgresql/install_postgresql.yml
-- import_playbook: database/mongodb/install_mongodb.yml
-# - import_playbook: database/redis/install_redis.yml
+# - import_playbook: database/mongodb/install_mongodb.yml
+- import_playbook: database/redis/install_redis.yml

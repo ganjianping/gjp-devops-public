@@ -1,0 +1,45 @@
+---
+# Ansible Playbook: Execute Redis Init Data
+# Description: Copies and executes a Redis script to initialize sample data
+# Target: Ubuntu servers
+
+- name: Execute Redis Init Data
+  hosts: ubuntu
+  become: true
+  gather_facts: false
+
+  vars:
+    redis_password: "redis2026!"
+    redis_host: "127.0.0.1"
+    redis_port: 6379
+    redis_scripts:
+      - "{{ playbook_dir }}/../../../files/redis/sample_data.txt"
+
+  tasks:
+    - name: Ensure remote temporary directory exists
+      file:
+        path: /tmp/redis_scripts
+        state: directory
+        mode: '0755'
+      tags: ['redis', 'script']
+
+    - name: Copy Redis scripts to target server
+      copy:
+        src: "{{ item }}"
+        dest: "/tmp/redis_scripts/{{ item | basename }}"
+        mode: '0644'
+      loop: "{{ redis_scripts }}"
+      tags: ['redis', 'script']
+
+    - name: Execute Redis scripts
+      shell: >
+        cat /tmp/redis_scripts/{{ item | basename }} | redis-cli -h {{ redis_host }} -p {{ redis_port }} -a "{{ redis_password }}"
+      loop: "{{ redis_scripts }}"
+      tags: ['redis', 'script']
+
+    - name: Clean up temporary Redis scripts
+      file:
+        path: "/tmp/redis_scripts/{{ item | basename }}"
+        state: absent
+      loop: "{{ redis_scripts }}"
+      tags: ['redis', 'script']

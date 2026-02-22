@@ -1,0 +1,13 @@
+SET demo:string:name "John Doe"
+SET demo:string:email "john@example.com"
+LPUSH demo:list:tasks "Task 3"
+LPUSH demo:list:tasks "Task 2"
+LPUSH demo:list:tasks "Task 1"
+SADD demo:set:tags "database" "cache" "fast" "in-memory"
+HSET demo:hash:user:100 username "alice" password "secret" age "30"
+ZADD demo:zset:leaderboard 100 "player1" 200 "player2" 150 "player3"
+SETBIT demo:bitmap:logins:2026-02 0 1
+SETBIT demo:bitmap:logins:2026-02 1 1
+PFADD demo:hll:unique_visitors:2026-02-22 "user1" "user2" "user3" "user1"
+GEOADD demo:geo:cities -122.4194 37.7749 "San Francisco" -118.2437 34.0522 "Los Angeles"
+XADD demo:stream:sensor:temperature * sensor_id 1234 value 19.5
