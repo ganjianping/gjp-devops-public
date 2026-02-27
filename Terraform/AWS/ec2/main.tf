@@ -126,6 +126,17 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = var.key_name != "" ? var.key_name : aws_key_pair.main.key_name 
   associate_public_ip_address = var.enable_public_ip
+
+  dynamic "instance_market_options" {
+    for_each = var.use_spot_instance ? [1] : []
+    content {
+      market_type = "spot"
+      spot_options {
+        max_price = var.spot_max_price
+      }
+    }
+  }
+
   root_block_device {
     volume_size           = var.root_volume_size    
     volume_type           = var.root_volume_type    

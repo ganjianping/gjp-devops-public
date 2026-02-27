@@ -68,6 +68,18 @@ variable "ec2_open_tcp_ports" {
   type        = list(number)
 }
 
+variable "use_spot_instance" {
+  description = "Whether to use a Spot Instance instead of On-Demand"
+  type        = bool
+  default     = false
+}
+
+variable "spot_max_price" {
+  description = "Maximum price for the Spot Instance (leave null for On-Demand price)"
+  type        = string
+  default     = null
+}
+
 variable "additional_tags" {
   description = "Additional tags to apply to resources"
   type        = map(string)

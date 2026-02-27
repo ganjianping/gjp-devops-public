@@ -6,3 +6,4 @@
 # - import_playbook: database/mysql/execute_mysql_sqls.yml
 # - import_playbook: database/postgresql/execute_postgresql_sqls.yml
 # - import_playbook: database/mongodb/execute_mongodb_script.yml
+# - import_playbook: database/redis/execute_redis_script.yml
