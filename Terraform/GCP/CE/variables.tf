@@ -32,40 +32,58 @@ variable "machine_type" {
   default     = "e2-medium"
 }
 
-variable "image" {
-  description = "Image to use for the boot disk"
+variable "os_type" {
+  description = "Operating system type for the instance"
   type        = string
-  default     = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
+  default     = "ubuntu"
+}
+
+variable "image" {
+  description = "Image to use for the boot disk (leave empty to use os_type)"
+  type        = string
+  default     = ""
 }
 
 variable "disk_size_gb" {
   description = "Size of the boot disk in GB"
   type        = number
-  default     = 20
+  default     = 50
 }
 
 variable "disk_type" {
   description = "Type of the boot disk"
   type        = string
-  default     = "pd-standard"
+  default     = "pd-balanced"
 }
 
 variable "network" {
   description = "Network to attach the instance to"
   type        = string
-  default     = "default"
+  default     = ""
 }
 
 variable "subnetwork" {
   description = "Subnetwork to attach the instance to"
   type        = string
-  default     = "default"
+  default     = ""
 }
 
 variable "enable_public_ip" {
   description = "Whether to assign a public IP to the instance"
   type        = bool
   default     = true
+}
+
+variable "allowed_ssh_cidr" {
+  description = "CIDR blocks allowed to SSH to the instance"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "open_tcp_ports" {
+  description = "List of TCP ports to allow from anywhere (0.0.0.0/0)"
+  type        = list(number)
+  default     = []
 }
 
 variable "ssh_user" {
@@ -84,4 +102,16 @@ variable "tags" {
   description = "Network tags for the instance"
   type        = list(string)
   default     = []
+}
+
+variable "use_spot_instance" {
+  description = "Whether to use a Spot (Preemptible) Instance instead of On-Demand"
+  type        = bool
+  default     = false
+}
+
+variable "additional_labels" {
+  description = "Additional labels to apply to resources"
+  type        = map(string)
+  default     = {}
 }
