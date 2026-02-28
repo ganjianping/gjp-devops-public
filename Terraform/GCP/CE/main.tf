@@ -84,7 +84,7 @@ resource "google_compute_instance" "instance" {
       preemptible                 = true
       provisioning_model          = "SPOT"
       automatic_restart           = false
-      instance_termination_action = "STOP"
+      instance_termination_action = "STOP" # or "DELETE"
     }
   }
 

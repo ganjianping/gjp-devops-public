@@ -5,15 +5,16 @@ environment         = "dev"
 resource_group_name = "gjp-rg"
 
 # Azure VM CPU-Only Server Configuration
-# instance_name = "gjp-azure-cpu-only"
-# instance_type = "Standard_B2s" # Standard_B2s (2C-4GB), Standard_D2s_v3 (2C-8GB)
-# open_tcp_ports = [80, 443, 3306, 5432, 27017, 6379] # HTTP, HTTPS, MySQL, PostgreSQL, MongoDB, Redis
+instance_name = "gjp-azure-cpu-only"
+instance_type = "Standard_B2s" # Standard_B2s (2C-4GB), Standard_D2s_v3 (2C-8GB)
+open_tcp_ports = [80, 443, 3306, 5432, 27017, 6379] # HTTP, HTTPS, MySQL, PostgreSQL, MongoDB, Redis
+disk_size_gb   = 30
 
 # Azure VM GPU Server Configuration (for LLMs)
-instance_name = "gjp-azure-gpu"
+# instance_name = "gjp-azure-gpu"
 # instance_type = "Standard_NC4as_T4_v3" # NVIDIA T4 (4C-28GB-1GPU) 
-open_tcp_ports = [80, 443, 11434] # HTTP, HTTPS, LLM API
-disk_size_gb   = 50
+# open_tcp_ports = [80, 443, 11434] # HTTP, HTTPS, LLM API
+# disk_size_gb   = 50
 
 # Azure VM Common Configuration
 vnet_name        = ""
@@ -26,7 +27,7 @@ public_key_path  = "~/.ssh/id_rsa.pub"
 disk_type        = "StandardSSD_LRS" # Standard_LRS, StandardSSD_LRS, Premium_LRS
 
 # Spot Instance Configuration
-use_spot_instance = false
+use_spot_instance = true
 # spot_max_price    = -1 # -1 means you won't be evicted for price reasons (only capacity)
 
 # Additional Tags
